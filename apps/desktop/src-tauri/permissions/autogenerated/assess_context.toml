@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-assess-context"
+description = "Enables the assess_context command without any pre-configured scope."
+commands.allow = ["assess_context"]
+
+[[permission]]
+identifier = "deny-assess-context"
+description = "Denies the assess_context command without any pre-configured scope."
+commands.deny = ["assess_context"]

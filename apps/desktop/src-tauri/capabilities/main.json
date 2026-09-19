@@ -1,0 +1,21 @@
+{
+  "identifier": "main",
+  "description": "Rooster bundled main window: registered inventory, reviewed changes, private drafts and recovery.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-load-settings",
+    "allow-choose-workspace",
+    "allow-remove-location",
+    "allow-start-scan",
+    "allow-scan-status",
+    "allow-search-artifacts",
+    "allow-cancel-scan",
+    "allow-get-inventory",
+    "allow-inspect-artifact",
+    "allow-assess-context",
+    "allow-editing",
+    "allow-choose-draft-source"
+  ]
+}

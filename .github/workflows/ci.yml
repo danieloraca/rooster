@@ -1,0 +1,65 @@
+name: Verify macOS
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 4
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, 1.90.0]
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Install Rust
+        run: rustup toolchain install '${{ matrix.rust }}' --profile minimal --component rustfmt --component clippy
+      - name: Frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Frontend tests and production build
+        working-directory: apps/desktop
+        run: |
+          npm test
+          npm run build
+      - name: Format
+        if: matrix.rust == 'stable'
+        run: cargo +stable fmt --all -- --check
+      - name: Rust tests
+        run: cargo +${{ matrix.rust }} test --workspace --locked
+      - name: Clippy
+        if: matrix.rust == 'stable'
+        run: cargo +stable clippy --workspace --all-targets --locked -- -D warnings
+      - name: Two-layout pilot
+        if: matrix.rust == 'stable'
+        run: |
+          cargo +stable build -p rooster-cli --locked
+          python3 scripts/pilot.py --binary target/debug/rooster --directory "$RUNNER_TEMP/rooster-pilot"
+      - name: Package local pilot
+        if: matrix.rust == 'stable'
+        working-directory: apps/desktop
+        run: npm run desktop:bundle
+      - name: Verify local bundle signature
+        if: matrix.rust == 'stable'
+        run: codesign --verify --deep --strict --verbose=2 target/release/bundle/macos/Rooster.app
+      - name: Installer smoke checks
+        if: matrix.rust == 'stable'
+        run: |
+          bash -n scripts/install.sh scripts/test-install.sh
+          scripts/test-install.sh target/release/bundle/macos/Rooster.app
