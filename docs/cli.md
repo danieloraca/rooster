@@ -12,6 +12,7 @@ rooster [--config <file>] workspace list [--json]
 rooster [--config <file>] workspace relocate <root-id> <path> [--json]
 rooster [--config <file>] scan [--workspace <id-or-name>] [--exclude <directory-name>] [--json]
 rooster [--config <file>] repos list [--workspace <id-or-name>] [--exclude <directory-name>] [--json]
+rooster evaluate <document.json>... [--threshold <0-to-1>] [--json]
 ~~~
 
 The config flag can appear after the subcommand too. Quote paths containing spaces. Relative paths resolve from the caller's current directory; a leading literal `~` resolves to the current user's home. Registration requires an existing directory and stores its canonical path.
@@ -19,6 +20,20 @@ The config flag can appear after the subcommand too. Quote paths containing spac
 Reuse a workspace name to append a root. Adding the same path to that workspace again returns its existing root ID. Different workspaces may contain the same path. Workspace selectors prefer an exact ID, then an exact name. Omitting the selector scans all workspaces.
 
 Relocation updates a root's registered path and preserves its ID; it does not move files. A registered folder that later goes offline or disappears remains in settings and produces a scan issue until it becomes available or is relocated.
+
+## TypeSafe JSON evaluation
+
+`evaluate` sends each supplied JSON string, object, or array to TypeSafe as one independent state. One Jev request per document evaluates two Noul questions in parallel: whether the document contains personal data and whether it requires human review. Set `TYPESAFE_API_KEY` before running it:
+
+~~~sh
+export TYPESAFE_API_KEY="..."
+cargo run -- evaluate examples/one.json examples/two.json
+cargo run -- evaluate examples/one.json examples/two.json --json
+~~~
+
+Human output is the default. `--json` emits the model, threshold, per-document decisions and raw yes probabilities, and token usage. `--threshold` controls when a probability becomes `true` or `yes` and defaults to `0.5`; the probability is always retained because a Noul answer has no separate confidence value.
+
+Document contents leave the machine and are processed by TypeSafe. Do not evaluate files that are unsuitable for that service. The initial question criteria are deliberately explicit but still require validation against representative documents before their decisions drive consequential automation. HTTP 429 and 529 responses are retried with bounded exponential backoff; other file, validation, authentication, and service errors fail without producing a partial report.
 
 ## Settings
 

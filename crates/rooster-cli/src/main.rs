@@ -1,6 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 mod artifacts;
 mod changes;
+mod evaluate;
 use rooster_core::{CancellationToken, ConfigStore, ScanOptions, ScanStatus, scan};
 use serde::Serialize;
 use std::{
@@ -26,6 +27,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Evaluate JSON documents for personal data and human-review needs using Jev.
+    Evaluate(evaluate::EvaluateArgs),
     /// Prepare, review, apply, and recover local file changes.
     Changes(changes::ChangeArgs),
     /// Discover and inspect provider instructions, skills, agents, and references.
@@ -107,6 +110,7 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
         None => ConfigStore::default_path()?,
     })?;
     match cli.command {
+        Command::Evaluate(args) => return evaluate::run(args),
         Command::Changes(args) => return changes::run(&store, args),
         Command::Artifacts { command } => return artifacts::run(&store, command),
         Command::Check(args) => return artifacts::check(&store, args),
