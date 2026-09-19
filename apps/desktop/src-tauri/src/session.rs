@@ -1,4 +1,5 @@
 mod editing;
+use crate::rerank;
 pub use editing::{EditingRequest, StructuralRequest};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use rooster_core::{
@@ -360,28 +361,42 @@ impl Session {
             return Err("Search is limited to 512 bytes.".into());
         }
         let (inventory, _) = self.current(generation)?;
-        let query = query.to_lowercase();
-        Ok(inventory
-            .artifacts
-            .iter()
-            .filter(|artifact| {
-                artifact.path.to_string().to_lowercase().contains(&query)
-                    || artifact
-                        .name
-                        .as_ref()
-                        .is_some_and(|name| name.to_lowercase().contains(&query))
-                    || artifact
-                        .description
-                        .as_ref()
-                        .is_some_and(|description| description.to_lowercase().contains(&query))
-                    || inventory
-                        .inspect(&artifact.id)
-                        .and_then(|view| view.snapshot)
-                        .and_then(|snapshot| snapshot.text.as_ref())
-                        .is_some_and(|text| text.to_lowercase().contains(&query))
-            })
-            .map(|artifact| artifact.id.clone())
-            .collect())
+        let lower = query.to_lowercase();
+        let mut matches = Vec::new();
+        let mut candidates = Vec::new();
+        for artifact in &inventory.artifacts {
+            let text = inventory
+                .inspect(&artifact.id)
+                .and_then(|view| view.snapshot)
+                .and_then(|snapshot| snapshot.text.clone());
+            let matched = artifact.path.to_string().to_lowercase().contains(&lower)
+                || artifact
+                    .name
+                    .as_ref()
+                    .is_some_and(|name| name.to_lowercase().contains(&lower))
+                || artifact
+                    .description
+                    .as_ref()
+                    .is_some_and(|description| description.to_lowercase().contains(&lower))
+                || text
+                    .as_ref()
+                    .is_some_and(|text| text.to_lowercase().contains(&lower));
+            if matched {
+                matches.push(artifact.id.clone());
+                candidates.push(rerank::Candidate {
+                    id: artifact.id.clone(),
+                    kind: serde_json::to_value(artifact.kind)
+                        .ok()
+                        .and_then(|value| value.as_str().map(str::to_owned))
+                        .unwrap_or_default(),
+                    name: artifact.name.clone().unwrap_or_default(),
+                    description: artifact.description.clone().unwrap_or_default(),
+                    path: artifact.path.to_string(),
+                    text: text.unwrap_or_default(),
+                });
+            }
+        }
+        Ok(rerank::rerank(query, &candidates).unwrap_or(matches))
     }
     pub fn assess(&self, generation: u64, id: &str) -> Result<ScopeAssessment> {
         let (inventory, contexts) = self.current(generation)?;

@@ -1,3 +1,4 @@
+mod rerank;
 pub mod session;
 use rooster_core::artifacts::ScopeAssessment;
 use session::{DesktopInventory, Inspection, ScanRequest, Session, Settings, Status};

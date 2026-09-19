@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import ArtifactList from '../ArtifactList';
-import { libraryRows } from '../library';
+import { libraryRows, rankLibraryRows } from '../library';
 import type { Artifact, Kind, SkillPackage } from '../types';
 
 afterEach(cleanup);
@@ -56,6 +56,12 @@ it('shows a matching child with its parent during search even when the parent do
   expect(screen.getByRole('region', { name: 'beta skill package' })).toHaveTextContent('agents/openai.yaml');
   expect(screen.queryByText('alpha')).not.toBeInTheDocument();
   expect(screen.getByText('1 matching package file')).toBeVisible();
+});
+it('keeps the backend relevance order for top-level and matching child results', () => {
+  const { rows } = libraryRows(artifacts, packages, 'all', artifact =>
+    ['alpha', 'beta-yaml'].includes(artifact.id));
+  const ranked = rankLibraryRows(rows, new Map([['beta-yaml', 0], ['alpha', 1]]));
+  expect(ranked.map(row => row.artifact.id)).toEqual(['beta', 'alpha']);
 });
 it('keeps malformed child metadata reachable in Needs attention', () => {
   const malformed: Artifact = { ...alphaMetadata, validation: 'malformed' };

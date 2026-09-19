@@ -3,7 +3,7 @@ import { AlertTriangle, BookOpen, Check, ChevronRight, CircleHelp, FileCode2, Fi
 import { useDesktop } from './useDesktop';
 import Details from './Details';
 import ArtifactList, { ArtifactIcon, relativeLabel } from './ArtifactList';
-import { libraryRows, matchesCategory } from './library';
+import { libraryRows, matchesCategory, rankLibraryRows } from './library';
 import type { Category } from './library';
 import Editing from './Editing';
 import RegisteredLocations from './RegisteredLocations';
@@ -19,7 +19,7 @@ export default function App({bridge}:{bridge:Bridge}) {
  const [category,setCategory]=useState<Category>('all');
  const [source,setSource]=useState('all');
  const [query,setQuery]=useState('');
- const [searchIds,setSearchIds]=useState<Set<string>|null>(null);
+ const [searchRank,setSearchRank]=useState<Map<string,number>|null>(null);
  const [searching,setSearching]=useState(false);
  const [attention,setAttention]=useState(false);
  const [selected,setSelected]=useState<string|null>(null);
@@ -37,7 +37,11 @@ export default function App({bridge}:{bridge:Bridge}) {
  const providerReady=inventory?.provider===desktop.selection.provider;
  const selectedRepo=checkouts?.find(repo=>repo.id===source);
  const sourceArtifacts=useMemo(()=>artifacts?.filter(a=>source==='all'||(source==='personal'?a.provenance!=='repository':a.owner.checkout_id===source))??[],[artifacts,source]);
- const visible=useMemo(()=>libraryRows(sourceArtifacts,inventory?.packages??[],category,a=>(!attention||a.validation!=='valid'||!!inventory?.diagnostics.some(d=>d.artifact_id===a.id))&&(!query.trim()||!!searchIds?.has(a.id))),[sourceArtifacts,category,attention,inventory,query,searchIds]);
+ const visible=useMemo(()=>{
+   const result=libraryRows(sourceArtifacts,inventory?.packages??[],category,a=>(!attention||a.validation!=='valid'||!!inventory?.diagnostics.some(d=>d.artifact_id===a.id))&&(!query.trim()||!!searchRank?.has(a.id)));
+   if(query.trim())result.rows=rankLibraryRows(result.rows,searchRank);
+   return result;
+ },[sourceArtifacts,category,attention,inventory,query,searchRank]);
  const contexts=inventory?.contexts.filter(context=>context.checkout_id===source)??[];
  const diagnosticCount=(inventory?.diagnostics.length??0)+(inventory?.repositories.issues.length??0);
  useEffect(()=>{
@@ -63,11 +67,11 @@ export default function App({bridge}:{bridge:Bridge}) {
  },[bridge,inventory,selected]);
  useEffect(()=>{
    let live=true;
-   if(!query.trim()||!inventory){setSearchIds(null);setSearching(false);return;}
-   setSearching(true);setSearchIds(null);
+   if(!query.trim()||!inventory){setSearchRank(null);setSearching(false);return;}
+   setSearching(true);setSearchRank(null);
    const timer=setTimeout(()=>{
-     bridge.search(inventory.generation,query.trim()).then(ids=>{if(live)setSearchIds(new Set(ids));})
-       .catch(e=>{if(live){desktop.setError(errorMessage(e));setSearchIds(new Set());}}).finally(()=>{if(live)setSearching(false);});
+     bridge.search(inventory.generation,query.trim()).then(ids=>{if(live)setSearchRank(new Map(ids.map((id,index)=>[id,index])));})
+       .catch(e=>{if(live){desktop.setError(errorMessage(e));setSearchRank(new Map());}}).finally(()=>{if(live)setSearching(false);});
    },180);
    return()=>{live=false;clearTimeout(timer);};
  },[bridge,inventory,query,desktop.setError]);

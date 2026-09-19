@@ -14,6 +14,15 @@ export interface LibraryRow {
   packageRoot: NativePath | null;
 }
 
+export function rankLibraryRows(rows: LibraryRow[], searchRank: Map<string, number> | null): LibraryRow[] {
+  if (searchRank === null) return rows;
+  const rank = (row: LibraryRow) => Math.min(
+    searchRank.get(row.artifact.id) ?? Infinity,
+    ...row.children.map(child => searchRank.get(child.id) ?? Infinity),
+  );
+  return [...rows].sort((left, right) => rank(left) - rank(right));
+}
+
 // Build the hierarchy from package identities, never filenames or skill names.
 // A matching child retains its parent as context even when the parent did not match.
 export function libraryRows(artifacts: Artifact[], packages: SkillPackage[], category: Category,
